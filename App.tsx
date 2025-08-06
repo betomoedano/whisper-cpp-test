@@ -67,105 +67,32 @@ export default function App() {
 
       console.log("Starting transcription...");
 
-      // Prepare audio file for transcription
-      const documentPath = `${RNFS.DocumentDirectoryPath}/jfk.wav`;
-      let sampleFilePath = documentPath;
-      let fileInfo = "";
+      // Simple approach: download audio file if not exists
+      const audioPath = `${RNFS.DocumentDirectoryPath}/jfk.wav`;
 
-      try {
-        // Check if file already exists in documents
-        const documentExists = await RNFS.exists(documentPath);
-
-        if (!documentExists) {
-          console.log("Audio file not found in documents, downloading...");
-
-          // Download the JFK sample directly from the internet
-          const downloadUrl =
-            "https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav";
-
-          console.log("Downloading audio file from:", downloadUrl);
-          const downloadResult = await RNFS.downloadFile({
-            fromUrl: downloadUrl,
-            toFile: documentPath,
-            headers: {},
-            background: false,
-            progressDivider: 1,
-            begin: (res) => {
-              console.log(
-                "Download started, content length:",
-                res.contentLength
-              );
-            },
-            progress: (res) => {
-              const progress = (res.bytesWritten / res.contentLength) * 100;
-              console.log(`Download progress: ${progress.toFixed(1)}%`);
-            },
-          }).promise;
-
-          if (downloadResult.statusCode === 200) {
-            console.log("Successfully downloaded audio file");
-          } else {
-            throw new Error(
-              `Download failed with status: ${downloadResult.statusCode}`
-            );
-          }
-        } else {
-          console.log("Audio file already exists in documents directory");
-        }
-
-        // Verify the file
-        const stats = await RNFS.stat(documentPath);
-        console.log("Final file stats:", stats);
-
-        // Basic validation - check file size is reasonable for audio
-        if (stats.size < 1000) {
-          console.warn("Warning: File seems too small to be valid audio");
-        } else if (stats.size > 50000000) {
-          console.warn("Warning: File seems too large");
-        } else {
-          console.log("File size looks reasonable for audio file");
-        }
-
-        fileInfo = `Method: Downloaded to documents\nPath: ${documentPath}\nSize: ${stats.size} bytes`;
-        sampleFilePath = documentPath;
-      } catch (prepareError) {
-        console.error("Error preparing audio file:", prepareError);
-        throw new Error(
-          `Failed to prepare audio file: ${prepareError.message}`
-        );
+      // Download file if it doesn't exist
+      if (!(await RNFS.exists(audioPath))) {
+        console.log("Downloading JFK sample...");
+        await RNFS.downloadFile({
+          fromUrl:
+            "https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav",
+          toFile: audioPath,
+        }).promise;
+        console.log("Download complete");
       }
 
-      const options = {
-        language: "en",
-        // Add more specific options
-        translate: false,
-        word_timestamps: false,
-        max_len: 0,
-        split_on_word: false,
-      };
-
-      console.log("Transcription options:", options);
-      console.log("File info:", fileInfo);
-
-      const { stop, promise } = whisperContext.transcribe(
-        sampleFilePath,
-        options
-      );
+      // Transcribe the audio
+      const options = { language: "en" };
+      const { promise } = whisperContext.transcribe(audioPath, options);
 
       const startTime = Date.now();
       const { result } = await promise;
       const endTime = Date.now();
 
       console.log(`Transcription completed in ${endTime - startTime}ms`);
-      console.log("Result length:", result.length);
       console.log("Result:", result);
 
-      const finalResult = result || "No transcription result";
-      setTranscriptionResult(
-        `${finalResult}\n\n--- Debug Info ---\n${fileInfo}\nProcessing time: ${
-          endTime - startTime
-        }ms`
-      );
+      setTranscriptionResult(result || "No transcription result");
     } catch (err) {
       const errorMessage = `Transcription failed: ${err}`;
       console.error(errorMessage);
@@ -221,23 +148,20 @@ export default function App() {
         </Text>
       </TouchableOpacity>
 
-      <ScrollView
-        style={styles.resultContainer}
-        showsVerticalScrollIndicator={true}
-      >
-        {transcriptionResult ? (
+      <ScrollView style={styles.resultContainer}>
+        {transcriptionResult && (
           <View>
             <Text style={styles.resultLabel}>Transcription Result:</Text>
             <Text style={styles.resultText}>{transcriptionResult}</Text>
           </View>
-        ) : null}
+        )}
 
-        {error ? (
+        {error && (
           <View>
             <Text style={styles.errorLabel}>Error:</Text>
             <Text style={styles.errorText}>{error}</Text>
           </View>
-        ) : null}
+        )}
       </ScrollView>
 
       <Text style={styles.infoText}>
