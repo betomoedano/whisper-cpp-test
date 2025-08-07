@@ -52,6 +52,7 @@ export default function App() {
     isInitializingModel,
     isDownloading,
     downloadProgress,
+    currentModelId,
     initializeWhisperModel,
     resetWhisperContext,
     getCurrentModel,
