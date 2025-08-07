@@ -38,3 +38,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# Whisper model files (large, downloaded automatically)
+assets/*.bin
+*.bin
