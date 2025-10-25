@@ -118,7 +118,6 @@ whisper-cpp-test/
 - **TypeScript** - Type-safe development
 - **whisper.rn** ^0.4.3 - React Native bindings for Whisper.cpp
 - **react-native-fs** - File system operations
-- **@siteed/expo-audio-studio** - Audio recording utilities
 
 ### Model Management
 

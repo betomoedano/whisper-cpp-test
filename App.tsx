@@ -10,24 +10,9 @@ import {
   Platform,
   PermissionsAndroid,
 } from "react-native";
-import type {
-  TranscribeRealtimeOptions,
-  TranscribeNewSegmentsResult,
-} from "whisper.rn";
+import type { TranscribeRealtimeOptions } from "whisper.rn";
 import RNFS from "react-native-fs";
-import { useAudioRecorder } from "@siteed/expo-audio-studio";
 import { useWhisperModels } from "./hooks/useWhisperModels";
-
-interface WhisperContext {
-  transcribe: (
-    filePath: string,
-    options: any
-  ) => { stop: () => void; promise: Promise<{ result: string }> };
-  transcribeRealtime: (options: TranscribeRealtimeOptions) => Promise<{
-    stop: () => Promise<void>;
-    subscribe: (callback: (event: any) => void) => void;
-  }>;
-}
 
 export default function App() {
   const [realtimeTranscriber, setRealtimeTranscriber] = useState<any>(null);
@@ -36,19 +21,10 @@ export default function App() {
   const [transcriptionResult, setTranscriptionResult] = useState<string>("");
   const [realtimeResult, setRealtimeResult] = useState<string>("");
   const [realtimeFinalResult, setRealtimeFinalResult] = useState<string>("");
-  const [lastProcessedResult, setLastProcessedResult] = useState<string>("");
-  const [realtimeSegments, setRealtimeSegments] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
   const [isDeletingModelId, setIsDeletingModelId] = useState<string | null>(
     null
   );
-
-  const audioRecorder = useAudioRecorder({
-    sampleRate: 16000,
-    numberOfChannels: 1,
-    bitDepth: 16,
-    outputFormat: "wav",
-  });
 
   const {
     whisperContext,
@@ -161,8 +137,6 @@ export default function App() {
               setRealtimeTranscriber(null);
               setRealtimeResult("");
               setRealtimeFinalResult("");
-              setLastProcessedResult("");
-              setRealtimeSegments([]);
             } catch (err) {
               const message = `Failed to delete model: ${err}`;
               console.error(message);
@@ -240,8 +214,6 @@ export default function App() {
 
       setIsRealtimeActive(true);
       setRealtimeResult("");
-      setLastProcessedResult("");
-      setRealtimeSegments([]);
       setError("");
 
       console.log("Starting real-time transcription...");
@@ -281,9 +253,6 @@ export default function App() {
 
           // Always update the display - this ensures we never miss updates
           setRealtimeResult(currentResult);
-
-          // Keep track of the last result for final transcript
-          setLastProcessedResult(currentResult);
 
           // Debug logging to help track what's happening
           console.log("📝 Real-time update:", {
@@ -327,7 +296,6 @@ export default function App() {
       }
 
       setIsRealtimeActive(false);
-      setLastProcessedResult("");
       console.log("Real-time transcription stopped");
     } catch (err) {
       console.error("Error stopping real-time transcription:", err);
