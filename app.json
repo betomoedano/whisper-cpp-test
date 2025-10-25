@@ -14,7 +14,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.betoatexpo.whisper-cpp-test"
+      "bundleIdentifier": "com.betoatexpo.whisper-cpp-test",
+      "appleTeamId": "T2A8YY9YDW"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,6 +28,13 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access the microphone for transcription."
+        }
+      ]
+    ]
   }
 }

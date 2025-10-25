@@ -8,11 +8,14 @@ import {
   ScrollView,
   Alert,
   Platform,
-  PermissionsAndroid,
 } from "react-native";
 import { useWhisperModels } from "./hooks/useWhisperModels";
 import { Directory, File, Paths } from "expo-file-system";
 import { TranscribeRealtimeOptions } from "whisper.rn/index.js";
+import {
+  getRecordingPermissionsAsync,
+  requestRecordingPermissionsAsync,
+} from "expo-audio";
 
 const APP_DIRECTORY_NAME = "whisper-app-files";
 
@@ -59,38 +62,43 @@ export default function App() {
   };
 
   const ensureMicrophonePermission = async (): Promise<boolean> => {
-    if (Platform.OS !== "android") {
-      return true;
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Unsupported Platform",
+        "Real-time transcription is not available on the web."
+      );
+      return false;
     }
 
-    try {
-      const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
-      const hasPermission = await PermissionsAndroid.check(permission);
-      if (hasPermission) {
-        return true;
-      }
-
-      const status = await PermissionsAndroid.request(permission);
-      const granted =
-        status === PermissionsAndroid.RESULTS.GRANTED ||
-        (typeof status === "object" &&
-          status[permission] === PermissionsAndroid.RESULTS.GRANTED);
-
-      if (granted) {
-        return true;
-      }
-
-      const blocked =
-        status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ||
-        (typeof status === "object" &&
-          status[permission] === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN);
-
-      const message = blocked
-        ? "Please enable microphone access in Android Settings to use real-time transcription."
+    const getPermissionText = (blocked: boolean) =>
+      blocked
+        ? Platform.OS === "android"
+          ? "Please enable microphone access in Android Settings to use real-time transcription."
+          : "Please enable microphone access in iOS Settings to use real-time transcription."
         : "Microphone permission is required for real-time transcription.";
 
-      Alert.alert("Microphone Permission", message);
-      console.warn("Microphone permission not granted:", status);
+    try {
+      let permissionStatus = await getRecordingPermissionsAsync();
+
+      if (permissionStatus.granted) {
+        return true;
+      }
+
+      if (!permissionStatus.canAskAgain) {
+        Alert.alert("Microphone Permission", getPermissionText(true));
+        console.warn("Microphone permission permanently denied.");
+        return false;
+      }
+
+      permissionStatus = await requestRecordingPermissionsAsync();
+
+      if (permissionStatus.granted) {
+        return true;
+      }
+
+      const blocked = !permissionStatus.canAskAgain;
+      Alert.alert("Microphone Permission", getPermissionText(blocked));
+      console.warn("Microphone permission not granted:", permissionStatus);
       return false;
     } catch (err) {
       console.error("Failed to verify microphone permission:", err);
