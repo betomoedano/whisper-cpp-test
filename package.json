@@ -9,17 +9,19 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "expo": "~53.0.20",
-    "expo-status-bar": "~2.2.3",
-    "react": "19.0.0",
-    "react-native": "0.79.5",
+    "expo": "^54.0.20",
+    "expo-dev-client": "~6.0.16",
+    "expo-file-system": "~19.0.17",
+    "expo-status-bar": "~3.0.8",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
     "react-native-fs": "^2.20.0",
-    "whisper.rn": "^0.4.3"
+    "whisper.rn": "^0.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
-    "@types/react": "~19.0.10",
-    "typescript": "~5.8.3"
+    "@types/react": "~19.1.10",
+    "typescript": "~5.9.2"
   },
   "private": true
 }

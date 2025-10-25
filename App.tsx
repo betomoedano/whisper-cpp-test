@@ -10,9 +10,11 @@ import {
   Platform,
   PermissionsAndroid,
 } from "react-native";
-import type { TranscribeRealtimeOptions } from "whisper.rn";
-import RNFS from "react-native-fs";
 import { useWhisperModels } from "./hooks/useWhisperModels";
+import { Directory, File, Paths } from "expo-file-system";
+import { TranscribeRealtimeOptions } from "whisper.rn/index.js";
+
+const APP_DIRECTORY_NAME = "whisper-app-files";
 
 export default function App() {
   const [realtimeTranscriber, setRealtimeTranscriber] = useState<any>(null);
@@ -163,23 +165,30 @@ export default function App() {
 
       console.log("Starting transcription...");
 
-      // Simple approach: download audio file if not exists
-      const audioPath = `${RNFS.DocumentDirectoryPath}/jfk.wav`;
+      const expoAudioPath = new File(
+        Paths.document,
+        APP_DIRECTORY_NAME,
+        "jfk.wav"
+      );
 
       // Download file if it doesn't exist
-      if (!(await RNFS.exists(audioPath))) {
+      if (!expoAudioPath.exists) {
         console.log("Downloading JFK sample...");
-        await RNFS.downloadFile({
-          fromUrl:
-            "https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav",
-          toFile: audioPath,
-        }).promise;
-        console.log("Download complete");
+        const url =
+          "https://github.com/ggerganov/whisper.cpp/raw/master/samples/jfk.wav";
+
+        // create directory
+        const destination = new Directory(Paths.document, APP_DIRECTORY_NAME);
+        destination.create({ intermediates: true });
+
+        // download
+        await File.downloadFileAsync(url, expoAudioPath);
+        console.log("download complete (jfk.wav) file");
       }
 
       // Transcribe the audio
       const options = { language: "en" };
-      const { promise } = whisperContext.transcribe(audioPath, options);
+      const { promise } = whisperContext.transcribe(expoAudioPath.uri, options);
 
       const startTime = Date.now();
       const { result } = await promise;
