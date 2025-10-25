@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  SafeAreaView,
 } from "react-native";
 import { useWhisperModels } from "./hooks/useWhisperModels";
 import { Directory, File, Paths } from "expo-file-system";
@@ -18,6 +19,7 @@ import {
 } from "expo-audio";
 
 const APP_DIRECTORY_NAME = "whisper-app-files";
+const ACCENT_COLOR = "#0A84FF";
 
 export default function App() {
   const [realtimeTranscriber, setRealtimeTranscriber] = useState<any>(null);
@@ -319,439 +321,474 @@ export default function App() {
     }
   };
 
+  const activeModelLabel = getCurrentModel()?.label || "Model";
+  const downloadPercentage =
+    getDownloadProgress(currentModelId || "base") ?? 0;
+  const whisperStatusText = isDownloading
+    ? `Downloading ${activeModelLabel} · ${(downloadPercentage * 100).toFixed(
+        0
+      )}%`
+    : isInitializingModel
+    ? "Initializing…"
+    : whisperContext
+    ? `Ready · ${activeModelLabel}`
+    : "Not initialized";
+  const realtimeStatusText = isRealtimeActive ? "Listening" : "Idle";
+  const transcriptionStatusText = isTranscribing
+    ? "Processing sample…"
+    : "Idle";
+  const storedModels = Object.entries(modelFiles);
+
   return (
-    <View style={styles.container}>
-      <StatusBar style="auto" />
-
-      <Text style={styles.title}>Whisper.rn Test App</Text>
-
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusLabel}>Status:</Text>
-        <Text
-          style={[
-            styles.statusText,
-            { color: whisperContext ? "#4CAF50" : "#FF5722" },
-          ]}
-        >
-          {isDownloading
-            ? `Downloading ${getCurrentModel()?.label || "Model"}... ${(
-                getDownloadProgress(currentModelId || "base") * 100
-              ).toFixed(0)}%`
-            : isInitializingModel
-            ? "Initializing..."
-            : whisperContext
-            ? `Ready (${getCurrentModel()?.label || "Unknown"})`
-            : "Not Initialized"}
-        </Text>
-      </View>
-
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusLabel}>Real-time:</Text>
-        <Text
-          style={[
-            styles.statusText,
-            { color: isRealtimeActive ? "#4CAF50" : "#666" },
-          ]}
-        >
-          {isRealtimeActive ? "ACTIVE" : "INACTIVE"}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          (!whisperContext || isTranscribing) && styles.buttonDisabled,
-        ]}
-        onPress={transcribeAudio}
-        disabled={!whisperContext || isTranscribing}
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.buttonText}>
-          {isTranscribing ? "Transcribing..." : "Transcribe JFK Sample"}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.modelSelectorContainer}>
-        <Text style={styles.modelSelectorLabel}>Select Model:</Text>
-        <View style={styles.modelButtons}>
-          <TouchableOpacity
-            style={[
-              styles.modelButton,
-              getCurrentModel()?.id === "large-v3-turbo" &&
-                styles.modelButtonActive,
-            ]}
-            onPress={() => initializeModel("large-v3-turbo")}
-            disabled={isDownloading || isInitializingModel}
-          >
-            <Text style={styles.modelButtonText}>large-v3-turbo</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.modelButton,
-              getCurrentModel()?.id === "tiny" && styles.modelButtonActive,
-            ]}
-            onPress={() => initializeModel("tiny")}
-            disabled={isDownloading || isInitializingModel}
-          >
-            <Text style={styles.modelButtonText}>Tiny</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.modelButton,
-              getCurrentModel()?.id === "base" && styles.modelButtonActive,
-            ]}
-            onPress={() => initializeModel("base")}
-            disabled={isDownloading || isInitializingModel}
-          >
-            <Text style={styles.modelButtonText}>Base</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.modelButton,
-              getCurrentModel()?.id === "small" && styles.modelButtonActive,
-            ]}
-            onPress={() => initializeModel("small")}
-            disabled={isDownloading || isInitializingModel}
-          >
-            <Text style={styles.modelButtonText}>Small</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {Object.entries(modelFiles).length > 0 && (
-        <View style={styles.downloadedModelsContainer}>
-          <Text style={styles.downloadedModelsTitle}>
-            Stored Whisper Models
+        <View style={styles.header}>
+          <Text style={styles.title}>Whisper Demo</Text>
+          <Text style={styles.subtitle}>
+            Minimal transcription playground for whisper.rn models.
           </Text>
-          {Object.entries(modelFiles).map(([modelId, info]) => {
-            const modelLabel = getModelById(modelId)?.label || modelId;
-            const isCurrent = currentModelId === modelId;
-            return (
-              <View key={modelId} style={styles.downloadedModelItem}>
-                <View style={styles.modelFileInfo}>
-                  <Text style={styles.modelFileName}>
-                    {modelLabel}
-                    {isCurrent ? " (active)" : ""}
-                  </Text>
-                  <Text style={styles.modelFileDetails}>
-                    Size: {formatBytes(info.size)}
-                  </Text>
-                  <Text style={styles.modelFileDetails} numberOfLines={1}>
-                    Path: {info.path}
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.deleteModelButton,
-                    isDeletingModelId === modelId && styles.buttonDisabled,
-                  ]}
-                  onPress={() => handleDeleteModel(modelId)}
-                  disabled={isDeletingModelId === modelId}
-                >
-                  <Text style={styles.deleteModelButtonText}>
-                    {isDeletingModelId === modelId ? "Deleting..." : "Delete"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
         </View>
-      )}
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          styles.realtimeButton,
-          !whisperContext && styles.buttonDisabled,
-        ]}
-        onPress={
-          isRealtimeActive
-            ? stopRealtimeTranscription
-            : startRealtimeTranscription
-        }
-        disabled={!whisperContext}
-      >
-        <Text style={styles.buttonText}>
-          {isRealtimeActive ? "🛑 Stop Real-time" : "🎤 Start Real-time"}
-        </Text>
-      </TouchableOpacity>
-
-      <ScrollView style={styles.resultContainer}>
-        {realtimeResult && isRealtimeActive && (
-          <View style={styles.realtimeSection}>
-            <Text style={styles.realtimeLabel}>
-              🎤 Real-time Transcription (Live):
-            </Text>
-            <Text style={styles.realtimeText}>{realtimeResult}</Text>
-          </View>
-        )}
-
-        {realtimeFinalResult && (
-          <View style={styles.finalRealtimeSection}>
-            <Text style={styles.finalRealtimeLabel}>
-              ✅ Final Real-time Transcript:
-            </Text>
-            <Text style={styles.finalRealtimeText}>{realtimeFinalResult}</Text>
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => setRealtimeFinalResult("")}
-            >
-              <Text style={styles.clearButtonText}>Clear</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {transcriptionResult && (
-          <View>
-            <Text style={styles.resultLabel}>📁 File Transcription:</Text>
-            <Text style={styles.resultText}>{transcriptionResult}</Text>
-          </View>
-        )}
-
-        {error && (
-          <View>
-            <Text style={styles.errorLabel}>Error:</Text>
+        {error ? (
+          <View style={[styles.card, styles.errorCard]}>
+            <Text style={styles.cardLabel}>Something went wrong</Text>
             <Text style={styles.errorText}>{error}</Text>
           </View>
-        )}
-      </ScrollView>
+        ) : null}
 
-      <Text style={styles.infoText}>
-        This app tests whisper.rn with downloadable models and supports both
-        file and real-time transcription.
-      </Text>
-    </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Status</Text>
+          <View style={styles.statusRow}>
+            <View
+              style={[
+                styles.statusCard,
+                whisperContext && styles.statusCardActive,
+              ]}
+            >
+              <Text style={styles.statusTitle}>Model</Text>
+              <Text style={styles.statusValue}>{whisperStatusText}</Text>
+            </View>
+            <View
+              style={[
+                styles.statusCard,
+                isRealtimeActive && styles.statusCardActive,
+              ]}
+            >
+              <Text style={styles.statusTitle}>Live</Text>
+              <Text style={styles.statusValue}>{realtimeStatusText}</Text>
+            </View>
+            <View style={styles.statusCard}>
+              <Text style={styles.statusTitle}>File</Text>
+              <Text style={styles.statusValue}>{transcriptionStatusText}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.card, isRealtimeActive && styles.liveCard]}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardLabel}>Live transcription</Text>
+            {isRealtimeActive ? (
+              <Text style={styles.liveBadge}>Live</Text>
+            ) : null}
+          </View>
+          <Text
+            style={[
+              styles.cardText,
+              !realtimeResult && styles.placeholderText,
+            ]}
+          >
+            {realtimeResult ||
+              "Start a live session to see the transcript populate here in real time."}
+          </Text>
+        </View>
+
+        {realtimeFinalResult ? (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>Latest live transcript</Text>
+              <TouchableOpacity onPress={() => setRealtimeFinalResult("")}>
+                <Text style={styles.link}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.cardText}>{realtimeFinalResult}</Text>
+          </View>
+        ) : null}
+
+        {transcriptionResult ? (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>File transcription</Text>
+            <Text style={styles.cardText}>{transcriptionResult}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Quick actions</Text>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[
+                styles.button,
+                styles.primaryButton,
+                (!whisperContext || isTranscribing) && styles.buttonDisabled,
+              ]}
+              onPress={transcribeAudio}
+              disabled={!whisperContext || isTranscribing}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isTranscribing ? "Transcribing…" : "Transcribe sample"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.button,
+                isRealtimeActive ? styles.stopButton : styles.secondaryButton,
+                !whisperContext && styles.buttonDisabled,
+              ]}
+              onPress={
+                isRealtimeActive
+                  ? stopRealtimeTranscription
+                  : startRealtimeTranscription
+              }
+              disabled={!whisperContext}
+            >
+              <Text
+                style={
+                  isRealtimeActive
+                    ? styles.stopButtonText
+                    : styles.secondaryButtonText
+                }
+              >
+                {isRealtimeActive ? "Stop live session" : "Start live session"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Models</Text>
+          <View style={styles.modelGrid}>
+            {["large-v3-turbo", "tiny", "base", "small"].map((modelId) => {
+              const isActive = getCurrentModel()?.id === modelId;
+              return (
+                <TouchableOpacity
+                  key={modelId}
+                  style={[
+                    styles.modelChip,
+                    isActive && styles.modelChipActive,
+                    (isDownloading || isInitializingModel) &&
+                      styles.buttonDisabled,
+                  ]}
+                  onPress={() => initializeModel(modelId)}
+                  disabled={isDownloading || isInitializingModel}
+                >
+                  <Text
+                    style={[
+                      styles.modelChipText,
+                      isActive && styles.modelChipTextActive,
+                    ]}
+                  >
+                    {modelId}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {storedModels.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Stored models</Text>
+            {storedModels.map(([modelId, info]) => {
+              const modelLabel = getModelById(modelId)?.label || modelId;
+              const isCurrent = currentModelId === modelId;
+              const deleting = isDeletingModelId === modelId;
+
+              return (
+                <View key={modelId} style={styles.storageRow}>
+                  <View style={styles.storageMeta}>
+                    <Text style={styles.storageName}>
+                      {modelLabel}
+                      {isCurrent ? " · active" : ""}
+                    </Text>
+                    <Text style={styles.storageDetails}>
+                      Size {formatBytes(info.size)}
+                    </Text>
+                    <Text
+                      style={styles.storagePath}
+                      numberOfLines={1}
+                      ellipsizeMode="middle"
+                    >
+                      {info.path}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => handleDeleteModel(modelId)}
+                    disabled={deleting}
+                  >
+                    <Text
+                      style={[
+                        styles.deleteLink,
+                        deleting && styles.deleteDisabled,
+                      ]}
+                    >
+                      {deleting ? "Deleting…" : "Remove"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        <Text style={styles.footerNote}>
+          whisper.rn demo — download a model, try a sample file, or speak live.
+        </Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: "#f5f5f5",
-    padding: 20,
+    backgroundColor: "#ffffff",
+  },
+  content: {
+    paddingHorizontal: 20,
     paddingTop: 60,
+    paddingBottom: 48,
+  },
+  header: {
+    marginBottom: 32,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 30,
-    color: "#333",
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#111111",
+    marginBottom: 8,
   },
-  statusContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  statusLabel: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-  },
-  statusText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginLeft: 8,
-  },
-  button: {
-    backgroundColor: "#2196F3",
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    backgroundColor: "#ccc",
-  },
-  secondaryButton: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#2196F3",
-  },
-  buttonText: {
-    color: "white",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  secondaryButtonText: {
-    color: "#2196F3",
-  },
-  realtimeButton: {
-    backgroundColor: "#FF9800",
-  },
-  downloadedModelsContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  downloadedModelsTitle: {
+  subtitle: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 10,
+    lineHeight: 20,
+    color: "#555555",
   },
-  downloadedModelItem: {
+  section: {
+    marginBottom: 28,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#777777",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+  statusRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -8,
+  },
+  statusCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: "#e5e5ea",
+    padding: 16,
+    marginHorizontal: 8,
+    marginBottom: 12,
+    minWidth: 140,
+    flexGrow: 1,
+  },
+  statusCardActive: {
+    borderColor: ACCENT_COLOR,
+    backgroundColor: "#f5f8ff",
+  },
+  statusTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666666",
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  statusValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#111111",
+    lineHeight: 22,
+  },
+  card: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e5e5ea",
+    padding: 20,
+    marginBottom: 24,
+  },
+  liveCard: {
+    borderColor: ACCENT_COLOR,
+    backgroundColor: "#f5f8ff",
+  },
+  cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: "#E0E0E0",
+    marginBottom: 12,
   },
-  modelFileInfo: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  modelFileName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#212121",
-  },
-  modelFileDetails: {
+  cardLabel: {
     fontSize: 12,
-    color: "#666",
-    marginTop: 2,
-  },
-  deleteModelButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#E53935",
-    borderRadius: 16,
-  },
-  deleteModelButtonText: {
-    color: "#fff",
     fontWeight: "600",
-    fontSize: 12,
+    color: "#777777",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
   },
-  realtimeSection: {
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: "#F0F8FF",
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#FF9800",
-  },
-  realtimeLabel: {
+  cardText: {
     fontSize: 16,
-    fontWeight: "bold",
-    color: "#FF9800",
-    marginBottom: 10,
+    lineHeight: 24,
+    color: "#111111",
   },
-  realtimeText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#333",
-    fontStyle: "italic",
+  placeholderText: {
+    color: "#8e8e93",
   },
-  finalRealtimeSection: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: "#F0FFF0",
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: "#4CAF50",
-  },
-  finalRealtimeLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#4CAF50",
-    marginBottom: 10,
-  },
-  finalRealtimeText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: "#333",
-    marginBottom: 10,
-  },
-  clearButton: {
-    alignSelf: "flex-end",
-    backgroundColor: "#FF5722",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-  },
-  clearButtonText: {
-    color: "white",
+  liveBadge: {
+    color: ACCENT_COLOR,
     fontSize: 12,
     fontWeight: "600",
   },
-  modelSelectorContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  modelSelectorLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#666",
-    marginBottom: 10,
-  },
-  modelButtons: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  modelButton: {
-    flex: 1,
-    marginHorizontal: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "transparent",
-    alignItems: "center",
-  },
-  modelButtonActive: {
-    backgroundColor: "#E3F2FD",
-    borderColor: "#2196F3",
-  },
-  modelButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#666",
-  },
-  resultContainer: {
-    flex: 1,
-    marginTop: 20,
-    marginBottom: 20,
-    backgroundColor: "white",
-    borderRadius: 8,
-    padding: 15,
-    maxHeight: 300,
-  },
-  resultLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#4CAF50",
-    marginBottom: 10,
-  },
-  resultText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#333",
-  },
-  errorLabel: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#FF5722",
-    marginBottom: 10,
+  errorCard: {
+    borderColor: "#ff3b30",
+    backgroundColor: "#fff5f4",
   },
   errorText: {
+    color: "#b3261e",
     fontSize: 14,
     lineHeight: 20,
-    color: "#FF5722",
   },
-  infoText: {
+  buttonRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -8,
+  },
+  button: {
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginHorizontal: 8,
+    marginBottom: 16,
+    minWidth: 160,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryButton: {
+    backgroundColor: ACCENT_COLOR,
+  },
+  primaryButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  secondaryButton: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d1d1d6",
+  },
+  secondaryButtonText: {
+    color: "#111111",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  stopButton: {
+    backgroundColor: "#111111",
+  },
+  stopButtonText: {
+    color: "#ffffff",
+    fontSize: 14,
+    fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+  modelGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginHorizontal: -6,
+  },
+  modelChip: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#d1d1d6",
+    marginHorizontal: 6,
+    marginBottom: 12,
+    backgroundColor: "#ffffff",
+  },
+  modelChipActive: {
+    borderColor: ACCENT_COLOR,
+    backgroundColor: "#f5f8ff",
+  },
+  modelChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#111111",
+  },
+  modelChipTextActive: {
+    color: ACCENT_COLOR,
+  },
+  storageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#e5e5ea",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    backgroundColor: "#ffffff",
+  },
+  storageMeta: {
+    flex: 1,
+    marginRight: 12,
+  },
+  storageName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#111111",
+    marginBottom: 6,
+  },
+  storageDetails: {
     fontSize: 12,
-    color: "#666",
+    color: "#666666",
+    marginBottom: 4,
+  },
+  storagePath: {
+    fontSize: 11,
+    color: "#8e8e93",
+  },
+  deleteLink: {
+    color: "#111111",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  deleteDisabled: {
+    opacity: 0.4,
+  },
+  link: {
+    color: ACCENT_COLOR,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  footerNote: {
+    fontSize: 12,
+    color: "#8e8e93",
     textAlign: "center",
-    fontStyle: "italic",
+    marginTop: 8,
   },
 });
