@@ -39,6 +39,9 @@ export default function App() {
   const [lastProcessedResult, setLastProcessedResult] = useState<string>("");
   const [realtimeSegments, setRealtimeSegments] = useState<string[]>([]);
   const [error, setError] = useState<string>("");
+  const [isDeletingModelId, setIsDeletingModelId] = useState<string | null>(
+    null
+  );
 
   const audioRecorder = useAudioRecorder({
     sampleRate: 16000,
@@ -54,10 +57,13 @@ export default function App() {
     isDownloading,
     downloadProgress,
     currentModelId,
+    modelFiles,
     initializeWhisperModel,
     resetWhisperContext,
     getCurrentModel,
     getDownloadProgress,
+    getModelById,
+    deleteModel,
   } = useWhisperModels();
 
   useEffect(() => {
@@ -116,6 +122,58 @@ export default function App() {
       );
       return false;
     }
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (!bytes) return "0 B";
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const index = Math.min(
+      units.length - 1,
+      Math.floor(Math.log(bytes) / Math.log(1024))
+    );
+    const scaled = bytes / Math.pow(1024, index);
+    return `${scaled.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
+  };
+
+  const handleDeleteModel = (modelId: string) => {
+    if (isRealtimeActive || isTranscribing) {
+      Alert.alert(
+        "Busy",
+        "Please stop any active transcription before deleting models."
+      );
+      return;
+    }
+
+    const modelLabel = getModelById(modelId)?.label || modelId;
+
+    Alert.alert(
+      "Delete Model",
+      `Remove ${modelLabel} from this device? You can download it again later.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeletingModelId(modelId);
+            try {
+              await deleteModel(modelId);
+              setRealtimeTranscriber(null);
+              setRealtimeResult("");
+              setRealtimeFinalResult("");
+              setLastProcessedResult("");
+              setRealtimeSegments([]);
+            } catch (err) {
+              const message = `Failed to delete model: ${err}`;
+              console.error(message);
+              Alert.alert("Delete Error", message);
+            } finally {
+              setIsDeletingModelId(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const transcribeAudio = async () => {
@@ -371,6 +429,46 @@ export default function App() {
         </View>
       </View>
 
+      {Object.entries(modelFiles).length > 0 && (
+        <View style={styles.downloadedModelsContainer}>
+          <Text style={styles.downloadedModelsTitle}>
+            Stored Whisper Models
+          </Text>
+          {Object.entries(modelFiles).map(([modelId, info]) => {
+            const modelLabel = getModelById(modelId)?.label || modelId;
+            const isCurrent = currentModelId === modelId;
+            return (
+              <View key={modelId} style={styles.downloadedModelItem}>
+                <View style={styles.modelFileInfo}>
+                  <Text style={styles.modelFileName}>
+                    {modelLabel}
+                    {isCurrent ? " (active)" : ""}
+                  </Text>
+                  <Text style={styles.modelFileDetails}>
+                    Size: {formatBytes(info.size)}
+                  </Text>
+                  <Text style={styles.modelFileDetails} numberOfLines={1}>
+                    Path: {info.path}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.deleteModelButton,
+                    isDeletingModelId === modelId && styles.buttonDisabled,
+                  ]}
+                  onPress={() => handleDeleteModel(modelId)}
+                  disabled={isDeletingModelId === modelId}
+                >
+                  <Text style={styles.deleteModelButtonText}>
+                    {isDeletingModelId === modelId ? "Deleting..." : "Delete"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       <TouchableOpacity
         style={[
           styles.button,
@@ -492,6 +590,53 @@ const styles = StyleSheet.create({
   },
   realtimeButton: {
     backgroundColor: "#FF9800",
+  },
+  downloadedModelsContainer: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: "white",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  downloadedModelsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 10,
+  },
+  downloadedModelItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderColor: "#E0E0E0",
+  },
+  modelFileInfo: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  modelFileName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#212121",
+  },
+  modelFileDetails: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 2,
+  },
+  deleteModelButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: "#E53935",
+    borderRadius: 16,
+  },
+  deleteModelButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 12,
   },
   realtimeSection: {
     marginBottom: 20,
