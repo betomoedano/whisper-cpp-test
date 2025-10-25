@@ -249,6 +249,10 @@ export default function App() {
       // Use the built-in transcribeRealtime method from whisper.rn
       const realtimeOptions: TranscribeRealtimeOptions = {
         language: "en",
+        // Keep the session alive well past the default 30s ceiling so we only stop on user action
+        realtimeAudioSec: 300,
+        realtimeAudioSliceSec: 20,
+        realtimeAudioMinSec: 2,
         audioSessionOnStartIos: {
           category: "PlayAndRecord" as any,
           options: ["MixWithOthers" as any],
