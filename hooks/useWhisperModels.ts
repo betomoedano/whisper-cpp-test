@@ -4,9 +4,14 @@
  * Download from https://huggingface.co/ggerganov/whisper.cpp/tree/main
  */
 import { useState, useCallback, useEffect } from "react";
-import { initWhisper, initWhisperVad } from "whisper.rn";
-import RNFS from "react-native-fs";
-import type { WhisperContext } from "whisper.rn";
+import { Directory, File, Paths } from "expo-file-system";
+import {
+  createDownloadResumable,
+  type DownloadProgressData,
+  type FileSystemDownloadResult,
+} from "expo-file-system/legacy";
+import { initWhisper, initWhisperVad } from "whisper.rn/index.js";
+import type { WhisperContext } from "whisper.rn/index.js";
 
 export interface WhisperModel {
   id: string;
@@ -95,36 +100,53 @@ export function useWhisperModels() {
   const [currentModelId, setCurrentModelId] = useState<string | null>(null);
 
   const getModelDirectory = useCallback(async () => {
-    const directory = `${RNFS.DocumentDirectoryPath}/whisper-models/`;
-    await RNFS.mkdir(directory).catch(() => {});
+    let documentDirectory: Directory;
+    try {
+      documentDirectory = Paths.document;
+    } catch (error) {
+      throw new Error("Document directory is not available.");
+    }
+
+    if (!documentDirectory?.uri) {
+      throw new Error("Document directory is not available.");
+    }
+
+    const directory = new Directory(documentDirectory, "whisper-models");
+    try {
+      directory.create({ idempotent: true, intermediates: true });
+    } catch (error) {
+      console.warn("Failed to ensure Whisper model directory exists:", error);
+      throw error;
+    }
     return directory;
   }, []);
 
   const downloadModel = useCallback(
     async (model: WhisperModel) => {
       const directory = await getModelDirectory();
-      const filePath = `${directory}${model.filename}`;
+      const file = new File(directory, model.filename);
 
       // Helper to update cache with latest stat info
-      const updateModelFileInfo = async () => {
+      const updateModelFileInfo = () => {
         try {
-          const stats = await RNFS.stat(filePath);
+          const stats = file.info();
+          if (!stats.exists) throw new Error("File not found");
           setModelFiles((prev) => ({
             ...prev,
             [model.id]: {
-              path: filePath,
+              path: file.uri,
               size: Number(stats.size) || 0,
             },
           }));
         } catch (statError) {
           console.warn(
-            `Failed to stat model file ${model.id} at ${filePath}:`,
+            `Failed to stat model file ${model.id} at ${file.uri}:`,
             statError
           );
           setModelFiles((prev) => ({
             ...prev,
             [model.id]: {
-              path: filePath,
+              path: file.uri,
               size: 0,
             },
           }));
@@ -132,51 +154,64 @@ export function useWhisperModels() {
       };
 
       // Check if file already exists
-      const fileExists = await RNFS.exists(filePath);
-      if (fileExists) {
-        console.log(`Model ${model.id} already exists at ${filePath}`);
-        await updateModelFileInfo();
-        return filePath;
+      let existingInfo;
+      try {
+        existingInfo = file.info();
+      } catch (infoError) {
+        console.warn(
+          `Failed to read info for model ${model.id} at ${file.uri}:`,
+          infoError
+        );
+        existingInfo = { exists: false };
+      }
+      if (existingInfo.exists) {
+        console.log(`Model ${model.id} already exists at ${file.uri}`);
+        updateModelFileInfo();
+        return file.uri;
       }
 
       setIsDownloading(true);
       console.log(`Downloading model ${model.id} from ${model.url}`);
 
       try {
-        const downloadResult = await RNFS.downloadFile({
-          fromUrl: model.url,
-          toFile: filePath,
-          headers: {},
-          background: false,
-          progressDivider: 10,
-          begin: (res) => {
-            console.log(
-              `Download started for ${model.id}, content length:`,
-              res.contentLength
-            );
-          },
-          progress: (res) => {
-            const progress = res.bytesWritten / res.contentLength;
+        const downloadResumable = createDownloadResumable(
+          model.url,
+          file.uri,
+          undefined,
+          (progressData: DownloadProgressData) => {
+            const { totalBytesWritten, totalBytesExpectedToWrite } = progressData;
+            const fraction =
+              totalBytesExpectedToWrite > 0
+                ? totalBytesWritten / totalBytesExpectedToWrite
+                : 0;
             setDownloadProgress((prev) => ({
               ...prev,
-              [model.id]: progress,
+              [model.id]: fraction,
             }));
             console.log(
-              `Download progress for ${model.id}: ${(progress * 100).toFixed(
+              `Download progress for ${model.id}: ${(fraction * 100).toFixed(
                 1
               )}%`
             );
           },
-        }).promise;
+        );
 
-        if (downloadResult.statusCode === 200) {
+        const downloadResult = (await downloadResumable.downloadAsync()) as
+          | FileSystemDownloadResult
+          | undefined;
+
+        if (
+          downloadResult &&
+          (downloadResult.status === 0 ||
+            (downloadResult.status >= 200 && downloadResult.status < 300))
+        ) {
           console.log(`Successfully downloaded model ${model.id}`);
-          await updateModelFileInfo();
+          updateModelFileInfo();
           setDownloadProgress((prev) => ({ ...prev, [model.id]: 1 }));
-          return filePath;
+          return file.uri;
         } else {
           throw new Error(
-            `Download failed with status: ${downloadResult.statusCode}`
+            `Download failed with status: ${downloadResult?.status}`
           );
         }
       } catch (error) {
@@ -277,9 +312,10 @@ export function useWhisperModels() {
       }
 
       try {
-        const exists = await RNFS.exists(fileInfo.path);
-        if (exists) {
-          await RNFS.unlink(fileInfo.path);
+        const file = new File(fileInfo.path);
+        const info = file.info();
+        if (info.exists) {
+          file.delete();
           console.log(`Deleted model file at ${fileInfo.path}`);
         }
       } catch (error) {
@@ -325,17 +361,16 @@ export function useWhisperModels() {
         const directory = await getModelDirectory();
         const entries = await Promise.all(
           WHISPER_MODELS.map(async (model) => {
-            const filePath = `${directory}${model.filename}`;
-            const exists = await RNFS.exists(filePath);
-            if (!exists) return null;
-
+            const file = new File(directory, model.filename);
             try {
-              const stats = await RNFS.stat(filePath);
+              const fileInfo = file.info();
+              if (!fileInfo.exists) return null;
+
               return {
                 id: model.id,
                 info: {
-                  path: filePath,
-                  size: Number(stats.size) || 0,
+                  path: file.uri,
+                  size: Number(fileInfo.size) || 0,
                 },
               } as { id: string; info: ModelFileInfo };
             } catch (statError) {
@@ -346,7 +381,7 @@ export function useWhisperModels() {
               return {
                 id: model.id,
                 info: {
-                  path: filePath,
+                  path: file.uri,
                   size: 0,
                 },
               };

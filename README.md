@@ -113,11 +113,11 @@ whisper-cpp-test/
 
 ### Core Technologies
 
-- **React Native** 0.79.5 - Cross-platform mobile framework
-- **Expo** ~53.0 - Development and build tooling
+- **React Native** 0.81.5 - Cross-platform mobile framework
+- **Expo** ^54.0 - Development and build tooling
 - **TypeScript** - Type-safe development
-- **whisper.rn** ^0.4.3 - React Native bindings for Whisper.cpp
-- **react-native-fs** - File system operations
+- **whisper.rn** ^0.5.1 - React Native bindings for Whisper.cpp
+- **expo-file-system** - File system operations
 
 ### Model Management
 
