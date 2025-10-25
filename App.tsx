@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Platform,
+  PermissionsAndroid,
 } from "react-native";
 import type {
   TranscribeRealtimeOptions,
@@ -73,6 +74,50 @@ export default function App() {
     }
   };
 
+  const ensureMicrophonePermission = async (): Promise<boolean> => {
+    if (Platform.OS !== "android") {
+      return true;
+    }
+
+    try {
+      const permission = PermissionsAndroid.PERMISSIONS.RECORD_AUDIO;
+      const hasPermission = await PermissionsAndroid.check(permission);
+      if (hasPermission) {
+        return true;
+      }
+
+      const status = await PermissionsAndroid.request(permission);
+      const granted =
+        status === PermissionsAndroid.RESULTS.GRANTED ||
+        (typeof status === "object" &&
+          status[permission] === PermissionsAndroid.RESULTS.GRANTED);
+
+      if (granted) {
+        return true;
+      }
+
+      const blocked =
+        status === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ||
+        (typeof status === "object" &&
+          status[permission] === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN);
+
+      const message = blocked
+        ? "Please enable microphone access in Android Settings to use real-time transcription."
+        : "Microphone permission is required for real-time transcription.";
+
+      Alert.alert("Microphone Permission", message);
+      console.warn("Microphone permission not granted:", status);
+      return false;
+    } catch (err) {
+      console.error("Failed to verify microphone permission:", err);
+      Alert.alert(
+        "Microphone Permission",
+        "Unable to verify microphone permission. Please try again."
+      );
+      return false;
+    }
+  };
+
   const transcribeAudio = async () => {
     if (!whisperContext) {
       Alert.alert("Error", "Whisper not initialized");
@@ -129,6 +174,12 @@ export default function App() {
     }
 
     try {
+      const hasMicPermission = await ensureMicrophonePermission();
+      if (!hasMicPermission) {
+        setError("Real-time transcription requires microphone access.");
+        return;
+      }
+
       setIsRealtimeActive(true);
       setRealtimeResult("");
       setLastProcessedResult("");
@@ -275,6 +326,18 @@ export default function App() {
       <View style={styles.modelSelectorContainer}>
         <Text style={styles.modelSelectorLabel}>Select Model:</Text>
         <View style={styles.modelButtons}>
+          <TouchableOpacity
+            style={[
+              styles.modelButton,
+              getCurrentModel()?.id === "large-v3-turbo" &&
+                styles.modelButtonActive,
+            ]}
+            onPress={() => initializeModel("large-v3-turbo")}
+            disabled={isDownloading || isInitializingModel}
+          >
+            <Text style={styles.modelButtonText}>large-v3-turbo</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[
               styles.modelButton,

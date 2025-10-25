@@ -1,3 +1,8 @@
+/**
+ * OpenAI's Whisper models converted to ggml format for use with whisper.cpp
+ *
+ * Download from https://huggingface.co/ggerganov/whisper.cpp/tree/main
+ */
 import { useState, useCallback } from "react";
 import { initWhisper, initWhisperVad } from "whisper.rn";
 import RNFS from "react-native-fs";
@@ -16,6 +21,16 @@ export interface WhisperModel {
 }
 
 export const WHISPER_MODELS: WhisperModel[] = [
+  {
+    id: "large-v3-turbo",
+    label: "Large Multilanguae",
+    url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
+    filename: "ggml-large-v3-turbo.bin",
+    capabilities: {
+      multilingual: true,
+      quantizable: false,
+    },
+  },
   {
     id: "tiny",
     label: "Tiny (en)",
