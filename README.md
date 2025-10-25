@@ -2,6 +2,8 @@
 
 A React Native + Expo application demonstrating real-time speech-to-text transcription using OpenAI's Whisper model via [whisper.rn](https://github.com/mybigday/whisper.rn).
 
+See the 🎥 [demo video](https://x.com/betomoedano/status/1982162498510844000)
+
 ## ✨ Features
 
 ### 🎙️ Real-time Transcription
